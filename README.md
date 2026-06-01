@@ -4,6 +4,16 @@ CoTail Visual System is a browser-based control plane for measurement-driven dia
 
 The project is intentionally independent from paper artifact folders. It is packaged as a reproducible FastAPI + static frontend application that can run on a Linux multi-GPU server.
 
+## Interface Preview
+
+Desktop runtime console:
+
+![CoTail desktop dashboard](docs/assets/cotail-desktop-dashboard.png)
+
+Responsive mobile layout:
+
+![CoTail mobile dashboard](docs/assets/cotail-mobile-dashboard.png)
+
 ## Features
 
 - Real-time GPU, GPU-process, CPU, memory, and managed-job monitoring.
