@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CoTail Runtime Console</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CT</div>
+          <div>
+            <h1>CoTail</h1>
+            <p>Runtime control plane</p>
+          </div>
+        </div>
+        <nav>
+          <button class="nav-item active" data-view="monitor">实时监控</button>
+          <button class="nav-item" data-view="diagnosis">自动诊断</button>
+          <button class="nav-item" data-view="micro">微观 CPTI</button>
+          <button class="nav-item" data-view="workflow">策略流</button>
+          <button class="nav-item" data-view="tenants">租户成本</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h2 id="page-title">实时监控</h2>
+            <p id="page-subtitle">共享 8×4090 服务器上的 GPU、vLLM 服务、请求压测和托管作业。</p>
+          </div>
+          <div id="global-status" class="status-pill">connecting</div>
+        </header>
+
+        <section id="view-monitor" class="view active">
+          <div class="metrics-grid">
+            <div class="metric"><span>Host</span><strong id="rt-host">-</strong></div>
+            <div class="metric"><span>CPU</span><strong id="rt-cpu">-</strong></div>
+            <div class="metric"><span>Memory</span><strong id="rt-mem">-</strong></div>
+            <div class="metric"><span>Idle GPU</span><strong id="rt-selected">-</strong></div>
+            <div class="metric"><span>Jobs</span><strong id="rt-jobs">-</strong></div>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>GPU 实时状态</h3>
+              <span id="rt-updated" class="muted">-</span>
+            </div>
+            <div id="gpu-grid" class="gpu-grid"></div>
+          </section>
+
+          <div class="split">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>动态调度启动</h3>
+                <button id="launch-job-btn" class="primary">生成/启动</button>
+              </div>
+              <div id="launch-status" class="notice">默认 dry-run 只生成命令。取消勾选 dry-run 后才会启动服务和 CPU 负载。</div>
+              <div class="form-grid">
+                <label class="field"><span>模型路径</span><input id="launch-model" value="/home/liguowei/models/deepseek-7b" /></label>
+                <label class="field"><span>后端</span><select id="launch-backend"><option>vllm</option><option>sglang</option><option>llama-server</option></select></label>
+                <label class="field checkbox-field"><span>自动选 GPU</span><input id="launch-auto-gpu" type="checkbox" checked /></label>
+                <label class="field"><span>手动 GPU</span><input id="launch-gpu" placeholder="例如 1" /></label>
+                <label class="field"><span>端口</span><input id="launch-port" value="8102" /></label>
+                <label class="field"><span>GPU memory util</span><input id="launch-gmem" value="0.7" /></label>
+                <label class="field"><span>max model len</span><input id="launch-maxlen" value="8192" /></label>
+                <label class="field checkbox-field"><span>enforce eager</span><input id="launch-eager" type="checkbox" checked /></label>
+                <label class="field"><span>CPU workload</span><select id="launch-workload"><option>none</option><option>stress-ng</option><option>ffmpeg</option><option>7zip</option><option>redis</option><option>openssl</option><option>kernel_build</option><option>memcached</option><option>nginx</option><option>zstd-compress</option><option>sqlite-txn</option><option>image-preprocess</option><option>text-search</option></select></label>
+                <label class="field"><span>CPU cores</span><input id="launch-cpus" value="0-60,128-188" /></label>
+                <label class="field"><span>workers</span><input id="launch-workers" value="60" /></label>
+                <label class="field"><span>min free MiB</span><input id="launch-minmem" value="18000" /></label>
+                <label class="field"><span>max util %</span><input id="launch-maxutil" value="10" /></label>
+                <label class="field"><span>extra args</span><input id="launch-extra" placeholder="例如 --trust-remote-code" /></label>
+                <label class="field checkbox-field"><span>dry-run</span><input id="launch-dryrun" type="checkbox" checked /></label>
+              </div>
+              <pre id="launch-output"></pre>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>GPU 进程</h3>
+              </div>
+              <div id="gpu-process-table" class="table"></div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>大模型请求与压测</h3>
+              <div class="top-actions">
+                <button id="llm-health-btn">检查模型</button>
+                <button id="llm-request-btn">单次请求</button>
+                <button id="llm-bench-btn" class="primary">并发压测</button>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>API base</span><input id="llm-api" value="http://127.0.0.1:8102/v1" /></label>
+              <label class="field"><span>model</span><input id="llm-model" value="/home/liguowei/models/deepseek-7b" /></label>
+              <label class="field"><span>max tokens</span><input id="llm-max-tokens" value="512" /></label>
+              <label class="field"><span>concurrency</span><input id="llm-concurrency" value="32" /></label>
+              <label class="field"><span>requests</span><input id="llm-requests" value="32" /></label>
+              <label class="field"><span>temperature</span><input id="llm-temperature" value="0.7" /></label>
+            </div>
+            <label class="field">
+              <span>prompt</span>
+              <textarea id="llm-prompt" class="small-textarea">请用三句话解释 CoTail 如何诊断 CPU co-location interference。</textarea>
+            </label>
+            <div class="metrics-grid request-metrics">
+              <div class="metric"><span>Success</span><strong id="req-success">-</strong></div>
+              <div class="metric"><span>TTFT avg</span><strong id="req-ttft">-</strong></div>
+              <div class="metric"><span>TPOT avg</span><strong id="req-tpot">-</strong></div>
+              <div class="metric"><span>Throughput</span><strong id="req-throughput">-</strong></div>
+              <div class="metric"><span>Latency</span><strong id="req-latency">-</strong></div>
+            </div>
+            <pre id="llm-output"></pre>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>托管作业</h3>
+              <button id="refresh-jobs">刷新作业</button>
+            </div>
+            <div id="jobs-table" class="table"></div>
+            <pre id="job-log-output"></pre>
+          </section>
+        </section>
+
+        <section id="view-diagnosis" class="view">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>一键采集 Baseline / Co-location / Protected</h3>
+            </div>
+            <div id="diagnosis-status" class="notice">先在无干扰状态采集 Baseline，再引入 CPU 负载采集 Co-location，执行保护策略后采集 Protected。</div>
+            <div class="notice">宏观指标口径已对齐旧实验脚本：concurrency 约等于旧脚本 batch_size，throughput = 成功请求生成 token 总数 / 本轮 wall time。</div>
+            <div class="form-grid">
+              <label class="field"><span>API base</span><input id="measure-api" value="http://127.0.0.1:8102/v1" /></label>
+              <label class="field"><span>model</span><input id="measure-model" value="/home/liguowei/models/deepseek-7b" /></label>
+              <label class="field"><span>requests: 本轮总请求数</span><input id="measure-requests" value="32" /></label>
+              <label class="field"><span>concurrency: 同时在飞请求数</span><input id="measure-concurrency" value="32" /></label>
+              <label class="field"><span>max tokens</span><input id="measure-max-tokens" value="512" /></label>
+              <label class="field checkbox-field"><span>执行 canary 请求</span><input id="measure-run-benchmark" type="checkbox" checked /></label>
+            </div>
+            <label class="field">
+              <span>canary prompt</span>
+              <textarea id="measure-prompt" class="small-textarea"></textarea>
+            </label>
+            <div class="top-actions prompt-actions">
+              <label class="field inline-number"><span>repeat_times</span><input id="measure-repeat-times" value="30" /></label>
+              <button id="build-long-prompt">生成旧脚本长 Prompt</button>
+              <span id="prompt-size" class="muted">-</span>
+            </div>
+            <div class="split">
+              <section class="inner-panel">
+                <div class="panel-head tight">
+                  <h3>Co-location 负载</h3>
+                  <div class="top-actions">
+                    <button id="start-workload-btn">启动负载</button>
+                    <button id="stop-workload-btn">停止当前</button>
+                  </div>
+                </div>
+                <div class="form-grid compact-grid">
+                  <label class="field"><span>负载类型</span><select id="measure-workload"><option>nginx</option><option>redis</option><option>kernel_build</option><option>stress-ng</option><option>ffmpeg</option><option>7zip</option><option>openssl</option><option>memcached</option><option>zstd-compress</option><option>sqlite-txn</option><option>image-preprocess</option><option>text-search</option></select></label>
+                  <label class="field"><span>CPU cores</span><input id="measure-workload-cores" value="0-60,128-188" /></label>
+                  <label class="field"><span>workers</span><input id="measure-workload-workers" value="60" /></label>
+                  <label class="field"><span>duration s</span><input id="measure-workload-duration" value="3600" /></label>
+                  <label class="field checkbox-field"><span>采集前启动负载</span><input id="measure-start-workload" type="checkbox" checked /></label>
+                  <label class="field checkbox-field"><span>负载 dry-run</span><input id="measure-workload-dryrun" type="checkbox" /></label>
+                </div>
+                <div id="workload-status" class="notice">Co-location 阶段将使用这里选择的 CPU 负载。</div>
+                <div class="top-actions">
+                  <button id="check-workload-btn">检测当前负载</button>
+                  <button id="stop-managed-workloads-btn">停止全部托管负载</button>
+                  <button id="scan-orphan-workloads-btn">扫描遗留负载</button>
+                  <button id="cleanup-orphan-workloads-btn">清理遗留负载</button>
+                  <button id="probe-all-workloads-btn" class="primary">一键探测全部负载</button>
+                  <label class="inline-check"><input id="probe-all-dryrun" type="checkbox" /> dry-run</label>
+                </div>
+                <div id="workload-health-table" class="table workload-health-table"></div>
+                <pre id="workload-health-output"></pre>
+              </section>
+
+              <section class="inner-panel">
+                <div class="panel-head tight">
+                  <h3>Protected 保护措施</h3>
+                  <div class="top-actions">
+                    <button id="measure-scan-service">扫描服务</button>
+                    <button id="measure-identify-tid">识别 TID</button>
+                  </div>
+                </div>
+                <div class="form-grid compact-grid">
+                  <label class="field"><span>保护策略</span><select id="measure-protection-policy"><option>rt</option><option>numa</option><option>rt+numa</option><option>nice</option><option>cgroup</option><option>none</option></select></label>
+                  <label class="field"><span>服务端口</span><input id="measure-protection-ports" value="8102" /></label>
+                  <label class="field"><span>vLLM PIDs</span><input id="measure-protection-pids" placeholder="1234,1235" /></label>
+                  <label class="field"><span>EngineCore TID</span><input id="measure-protection-tid" placeholder="1234" /></label>
+                  <label class="field"><span>Battle cores</span><input id="measure-protection-battle" value="0-60,128-188" /></label>
+                  <label class="field"><span>NUMA vLLM</span><input id="measure-protection-numa-vllm" value="0-63,128-191" /></label>
+                  <label class="field"><span>NUMA co-tenant</span><input id="measure-protection-numa-intf" value="64-127,192-255" /></label>
+                  <label class="field"><span>RT priority</span><input id="measure-protection-rt-priority" value="50" /></label>
+                  <label class="field checkbox-field"><span>Fix vLLM CPU placement</span><input id="measure-control-placement" type="checkbox" checked /></label>
+                  <label class="field checkbox-field"><span>Protected 前执行策略</span><input id="measure-apply-protection" type="checkbox" /></label>
+                </div>
+                <div id="protection-status" class="notice">Protected 阶段会使用这里选择的保护策略；默认不真实执行。</div>
+              </section>
+            </div>
+            <div class="top-actions phase-actions">
+              <button id="collect-baseline">采集 Baseline</button>
+              <button id="collect-colocation">采集 Co-location</button>
+              <button id="collect-protected">采集 Protected</button>
+            </div>
+          </section>
+
+          <div class="phase-grid">
+            <section class="panel phase-card" id="phase-baseline-card">
+              <h3>Baseline</h3>
+              <div id="phase-baseline" class="phase-body">未采集</div>
+            </section>
+            <section class="panel phase-card" id="phase-colocation-card">
+              <h3>Co-location</h3>
+              <div id="phase-colocation" class="phase-body">未采集</div>
+            </section>
+            <section class="panel phase-card" id="phase-protected-card">
+              <h3>Protected</h3>
+              <div id="phase-protected" class="phase-body">未采集</div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>性能变化视图</h3>
+              <span class="muted">Baseline vs Co-location vs Protected</span>
+            </div>
+            <div id="macro-bars" class="bars"></div>
+          </section>
+
+        </section>
+
+        <section id="view-micro" class="view">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>NVTX Trace 抓取与 CPTI 按需计算</h3>
+              <button id="refresh-micro-btn" class="primary">刷新微观诊断</button>
+            </div>
+            <div id="micro-status" class="notice">CPTI 需要四个核心阶段的 Baseline 与 Co-location P95/P99。请先解析 Nsight SQLite，再生成 CoTail 诊断。</div>
+            <div class="form-grid">
+              <label class="field"><span>Baseline SQLite</span><input id="stage-baseline-path" placeholder="/path/to/baseline.sqlite" /></label>
+              <label class="field"><span>Co-location SQLite</span><input id="stage-current-path" placeholder="/path/to/colocation.sqlite" /></label>
+              <label class="field"><span>Protected SQLite</span><input id="stage-protected-path" placeholder="/path/to/protected.sqlite" /></label>
+            </div>
+            <div class="top-actions">
+              <button id="parse-baseline-stage">解析 Baseline</button>
+              <button id="parse-current-stage">解析 Co-location</button>
+              <button id="parse-protected-stage">解析 Protected</button>
+              <button id="rebuild-with-stage" class="primary">生成 CoTail 诊断</button>
+            </div>
+            <div id="stage-source" class="kv-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3>核心阶段尾部放大</h3>
+              <span id="bottleneck-badge" class="badge">UNKNOWN</span>
+            </div>
+            <div id="stage-amplification" class="stage-chart"></div>
+          </section>
+        </section>
+
+        <section id="view-workflow" class="view">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>CoTail Live Workflow</h3>
+              <span id="workflow-current" class="muted">等待诊断</span>
+            </div>
+            <div id="workflow-graph" class="workflow-graph"></div>
+          </section>
+
+          <div class="metrics-grid">
+            <div class="metric"><span>Risk</span><strong id="m-risk">-</strong></div>
+            <div class="metric"><span>CPTI</span><strong id="m-cpti">-</strong></div>
+            <div class="metric"><span>Dominant Stage</span><strong id="m-dominant">-</strong></div>
+            <div class="metric"><span>Policy</span><strong id="m-policy">-</strong></div>
+            <div class="metric"><span>Decision</span><strong id="m-decision">-</strong></div>
+          </div>
+
+          <div class="split">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>CTS 验证盘</h3>
+                <span id="cts-text" class="muted">-</span>
+              </div>
+              <div class="gauge">
+                <div id="cts-gauge" class="gauge-fill" style="--value: 0"></div>
+                <strong id="cts-value">-</strong>
+              </div>
+              <div id="cts-explain" class="notice">执行保护后，系统会用 Protected 与 Co-location CPTI 计算 CTS。</div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Manual Override</h3>
+                <div class="top-actions">
+                  <button id="scan-service-btn">扫描服务</button>
+                  <button id="identify-tid-btn">识别 TID</button>
+                </div>
+              </div>
+              <div class="segmented">
+                <button data-policy="rt" class="active">RT</button>
+                <button data-policy="numa">NUMA</button>
+                <button data-policy="rt+numa">RT+NUMA</button>
+                <button data-policy="nice">nice</button>
+                <button data-policy="cgroup">cgroup</button>
+                <button data-policy="none">none</button>
+              </div>
+              <div class="form-grid">
+                <label class="field"><span>policy</span><input id="override-policy" value="rt" /></label>
+                <label class="field"><span>service ports</span><input id="override-ports" value="8102" /></label>
+                <label class="field"><span>vLLM PIDs</span><input id="override-pids" placeholder="1234,1235" /></label>
+                <label class="field"><span>EngineCore TID</span><input id="override-tid" placeholder="1234" /></label>
+                <label class="field"><span>Battle cores</span><input id="override-battle" value="0-60,128-188" /></label>
+                <label class="field"><span>NUMA vLLM</span><input id="override-numa-vllm" value="0-63,128-191" /></label>
+                <label class="field"><span>NUMA co-tenant</span><input id="override-numa-intf" value="64-127,192-255" /></label>
+                <label class="field"><span>RT priority</span><input id="override-rt-priority" value="50" /></label>
+              </div>
+              <div class="top-actions">
+                <button id="dry-run-policy">生成策略计划</button>
+                <button id="execute-policy" class="primary">执行策略</button>
+              </div>
+              <div id="policy-actions" class="table"></div>
+              <pre id="policy-output"></pre>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-tenants" class="view">
+          <section class="panel">
+            <div class="panel-head">
+              <h3>租户与负载成本核算</h3>
+              <button id="tenant-refresh-btn" class="primary">刷新租户画像</button>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>评估策略</span><select id="tenant-policy"><option>rt</option><option>numa</option><option>rt+numa</option><option>nice</option><option>cgroup</option><option>none</option></select></label>
+              <label class="field"><span>排除 LLM PIDs</span><input id="tenant-protected-pids" placeholder="1234,1235" /></label>
+              <label class="field"><span>显示数量</span><input id="tenant-limit" value="30" /></label>
+            </div>
+          </section>
+
+          <div class="metrics-grid">
+            <div class="metric"><span>CPU Pressure</span><strong id="tenant-cpu-pressure">-</strong></div>
+            <div class="metric"><span>Co-tenant Slowdown</span><strong id="tenant-slowdown">-</strong></div>
+            <div class="metric"><span>Cost Class</span><strong id="tenant-cost-class">-</strong></div>
+            <div class="metric"><span>Canary Overhead</span><strong id="tenant-canary-overhead">-</strong></div>
+            <div class="metric"><span>Trace Interval</span><strong id="tenant-trace-interval">-</strong></div>
+          </div>
+
+          <div class="split">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>共置负载画像</h3>
+                <span id="tenant-count" class="muted">-</span>
+              </div>
+              <div id="tenant-table" class="table"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>分析开销墙</h3>
+              </div>
+              <div id="overhead-wall" class="cost-wall"></div>
+              <pre id="tenant-output"></pre>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
