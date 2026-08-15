@@ -10,10 +10,6 @@ Desktop runtime console:
 
 ![CoTail desktop dashboard](docs/assets/cotail-desktop-dashboard.png)
 
-Responsive mobile layout:
-
-![CoTail mobile dashboard](docs/assets/cotail-mobile-dashboard.png)
-
 ## Features
 
 - Real-time GPU, GPU-process, CPU, memory, and managed-job monitoring.
